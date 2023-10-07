@@ -17,6 +17,7 @@
     // "moduleResolution": "nodenext",
 
     "allowJs": true, // allow importing `.js` from `.ts`
+	"strictNullChecks": false,
 
     // best practices
     "strict": true,
@@ -27,6 +28,10 @@
 	// JSX stuff
     "jsx": "react-jsx", // support JSX
     "jsxFragmentFactory": "Fragment",
-    "jsxImportSource": "hono/jsx"
+    "jsxImportSource": "hono/jsx",
+
+	// Mandatory to use with Option type from @mobily/ts-belt
+	"noUncheckedIndexedAccess": true
+
   }
 }

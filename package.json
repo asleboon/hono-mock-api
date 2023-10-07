@@ -5,7 +5,12 @@
   "dependencies": {
     "@hono/zod-openapi": "^0.4.0",
     "@mobily/ts-belt": "^3.13.1",
+    "fp-ts": "^2.16.1",
     "hono": "^3.6.0",
+    "io-ts": "^2.2.20",
+    "io-ts-types": "^0.5.19",
+    "monocle-ts": "^2.3.13",
+    "rambda": "^8.5.0",
     "zod": "^3.22.2"
   },
   "devDependencies": {
