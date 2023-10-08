@@ -48,4 +48,6 @@ const GeoNorgeOutput = GeoNorgeResponseSchema.transform(({ adresser }) => {
     return adresser[0].representasjonspunkt;
 });
 
-export { RepresentasjonspunktSchema, GeoNorgeResponseSchema };
+export type GeoLocation = z.infer<typeof RepresentasjonspunktSchema>;
+
+export { RepresentasjonspunktSchema, GeoNorgeResponseSchema, GeoNorgeOutput };

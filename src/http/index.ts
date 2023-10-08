@@ -1,4 +1,6 @@
+import { inMemoryCache } from "../cache/in-memory-cache";
 import { appEnv } from "../environment";
+import { getCacheKeyFromUrl } from "../middleware";
 import { AppError } from "../models/error";
 import * as TE from "fp-ts/TaskEither";
 
@@ -7,12 +9,21 @@ export const fetchAsync = async (
     options?: FetchRequestInit
 ): Promise<unknown> => {
     try {
+        const cacheKey = getCacheKeyFromUrl(new URL(url));
+        const cacheEntry = inMemoryCache.get(cacheKey);
+        if (cacheEntry) {
+            return cacheEntry.content;
+        }
+
         const response = await fetch(url, options);
+
         if (!response.ok) {
             const error = await response.text();
             throw new Error(`[${response.status}]: ${error}`);
         }
-        return response.json();
+        const data = await response.json();
+        inMemoryCache.set(cacheKey, { content: data, timestamp: Date.now() });
+        return data;
     } catch (err: unknown) {
         throw new Error(`FetchAsync error: ${err}`);
     }
@@ -69,9 +80,10 @@ const fetchTE = <A extends any[]>(
             })
         );
 };
+
 export const http = {
     fetchWeatherForecast: fetchTE(fetchWeatherNow),
-    fetchWeatherStation,
-    fetchAirTempObservations,
+    fetchWeatherStation: fetchTE(fetchWeatherStation),
+    fetchAirTempObservations: fetchTE(fetchAirTempObservations),
     fetchGeoLocation: fetchTE(fetchGeoLocation)
 };

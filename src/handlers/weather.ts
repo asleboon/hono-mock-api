@@ -1,30 +1,24 @@
-import { R, pipe } from "@mobily/ts-belt";
+import { pipe } from "fp-ts/function";
 import * as TE from "fp-ts/TaskEither";
 import { endTime, startTime } from "hono/timing";
 import { locationService, weatherService } from "../services";
 import { inMemoryCache } from "../cache/in-memory-cache";
+import { logTE, logTimeTE } from "../utils/log";
 
 const getWeatherNow = async (c: any) => {
     startTime(c, "now");
-    const { city, address } = c.req.valid("query");
-
-    const locationResult = await locationService.getLocation(address, city);
-
-    if (R.isError(locationResult)) {
-        return c.jsonT(locationResult._0, 404);
-    }
-
-    const { lon, lat } = pipe(locationResult, R.getExn);
+    const { address, city } = c.req.valid("query");
 
     return pipe(
-        weatherService.getWeatherNow(lon, lat),
+        locationService.getLocation(address, city),
+        TE.chain(({ lon, lat }) => weatherService.getWeatherNow(lon, lat)),
         TE.fold(
             error => () => {
                 const x = JSON.stringify(error);
                 return c.jsonT({ status: "Error", message: `${x}` }, 500);
             },
             value => () => {
-                endTime(c, "test");
+                endTime(c, "now");
                 inMemoryCache.set(c.req.url, {
                     content: value,
                     timestamp: Date.now()
@@ -35,46 +29,36 @@ const getWeatherNow = async (c: any) => {
     )();
 };
 
+// 16 sekunder what the fuck??
 const getWeatherHistoric = async (c: any) => {
     startTime(c, "historic");
-    const { city, address, from, to } = c.req.valid("query");
+    const { address, city, from, to } = c.req.valid("query");
 
-    const locationResult = await locationService.getLocation(address, city);
+    console.time("a");
+    return pipe(
+        locationService.getLocation(address, city),
+        logTimeTE("a", "step1"),
+        TE.chain(({ lon, lat }) =>
+            weatherService.getNearestWeatherStation(lon, lat)
+        ),
 
-    if (R.isError(locationResult)) {
-        endTime(c, "historic");
-        return c.jsonT(locationResult._0, 404);
-    }
-
-    const { lon, lat } = pipe(locationResult, R.getExn);
-    const stationResult = await weatherService.getNearestWeatherStation(
-        lon,
-        lat
-    );
-
-    if (R.isError(stationResult)) {
-        endTime(c, "historic");
-        return c.jsonT(stationResult._0, 500);
-    }
-
-    const stationId = pipe(stationResult, R.getExn);
-    const observationsResult =
-        await weatherService.getAirTemperatureObservations(stationId, from, to);
-
-    if (R.isError(observationsResult)) {
-        endTime(c, "historic");
-        return c.jsonT(stationResult._0, 500);
-    }
-
-    const observations = pipe(observationsResult, R.getExn);
-
-    inMemoryCache.set(c.req.url, {
-        content: observations,
-        timestamp: Date.now()
-    });
-
-    endTime(c, "historic");
-    return c.jsonT(observations);
+        logTimeTE("a", "step2"),
+        TE.chain(stationId =>
+            weatherService.getAirTemperatureObservations(stationId, from, to)
+        ),
+        logTimeTE("a", "step3"),
+        TE.fold(
+            error => () => {
+                return c.jsonT({ status: "Error", message: error.error }, 500);
+            },
+            value => () => {
+                logTimeTE("a", "step4");
+                console.timeEnd("a");
+                endTime(c, "historic");
+                return c.jsonT(value, 200);
+            }
+        )
+    )();
 };
 
 export const weatherHandler = {

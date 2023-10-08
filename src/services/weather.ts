@@ -1,14 +1,16 @@
-import { A, R, pipe as beltPipe, O, D } from "@mobily/ts-belt";
 import {
-    ObservationResponseSchema,
-    SourceResponseSchema
+    AirTempOutput,
+    AirTempResponse,
+    AirTemperatureOutput,
+    StationOutput,
+    WeatherStationResponse
 } from "../models/frost";
-import { safeParse } from "../utils/validation";
 import * as TE from "fp-ts/TaskEither";
 import { http } from "../http";
-import { pipe } from "fp-ts/function";
+import { flow, pipe } from "fp-ts/function";
 import { WeatherForecastOutput } from "../models/met";
 import { parseTE } from "../validation";
+import { AppError } from "../models/error";
 
 const getWeatherNow = (lon: number, lat: number) => {
     return pipe(
@@ -17,52 +19,54 @@ const getWeatherNow = (lon: number, lat: number) => {
     );
 };
 
-const getNearestWeatherStation = async (lon: number, lat: number) => {
-    const weatherStationResult = await http.fetchWeatherStation(lon, lat);
+// TODO: test without validation
+// TODO: cache station
 
-    return beltPipe(
-        weatherStationResult,
-        res => safeParse(SourceResponseSchema, res),
-        R.flatMap(value =>
-            beltPipe(
-                value.data,
-                D.get("data"),
-                O.flatMap(A.head),
-                O.flatMap(D.get("id")),
-                O.toResult({
-                    type: "NotFound",
-                    message: "Weather station not found"
-                })
-            )
-        )
+const transformStationResponse = (json: WeatherStationResponse): string => {
+    return json.data[0].id;
+};
+
+const transformAirTempResponse = (json: AirTempResponse): AirTempOutput[] => {
+    return json.data.map(d => ({
+        from: d.referenceTime,
+        value: d.observations[0].value
+    }));
+};
+
+const transformTE = <A extends any[], T>(
+    fn: (...args: A) => T | Promise<T>
+): ((...args: A) => TE.TaskEither<AppError, T>) => {
+    return (...args: A) =>
+        TE.tryCatch(
+            () => Promise.resolve(fn(...args)), // Wrap the result in a Promise
+            error => ({
+                type: "ERROR",
+                error: new Error(error as string)
+            })
+        );
+};
+
+const getNearestWeatherStation = (
+    lon: number,
+    lat: number
+): TE.TaskEither<AppError, string> => {
+    return pipe(
+        http.fetchWeatherStation(lon, lat),
+        TE.chain(parseTE(StationOutput))
+        // TE.chain(transformTE(transformStationResponse))
     );
 };
 
-const getAirTemperatureObservations = async (
+const getAirTemperatureObservations = (
     stationId: string,
     from: string,
     to: string
-) => {
-    const observations = await http.fetchAirTempObservations(
-        stationId,
-        from,
-        to
+): TE.TaskEither<AppError, AirTempOutput[]> => {
+    return pipe(
+        http.fetchAirTempObservations(stationId, from, to),
+        TE.chain(parseTE(AirTemperatureOutput))
+        // TE.chain(transformTE(transformAirTempResponse))
     );
-
-    const data = beltPipe(
-        observations,
-        ObservationResponseSchema.parse,
-        D.get("data"),
-        O.flatMap(
-            A.filterMap(value => ({
-                from: D.get(value, "referenceTime"),
-                value: O.flatMap(A.head(value.observations), D.get("value"))
-            }))
-        ),
-        O.toResult({ type: "NotFound", message: "Observations not found" })
-    );
-
-    return data;
 };
 
 export const weatherService = {
