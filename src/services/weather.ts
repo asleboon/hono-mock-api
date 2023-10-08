@@ -7,7 +7,7 @@ import {
 } from "../models/frost";
 import * as TE from "fp-ts/TaskEither";
 import { http } from "../http";
-import { flow, pipe } from "fp-ts/function";
+import { pipe } from "fp-ts/function";
 import { WeatherForecastOutput } from "../models/met";
 import { parseTE } from "../validation";
 import { AppError } from "../models/error";
@@ -18,9 +18,6 @@ const getWeatherNow = (lon: number, lat: number) => {
         TE.chain(parseTE(WeatherForecastOutput))
     );
 };
-
-// TODO: test without validation
-// TODO: cache station
 
 const transformStationResponse = (json: WeatherStationResponse): string => {
     return json.data[0].id;

@@ -5,46 +5,32 @@ import { FrontPage } from "./templates/index";
 import { cors } from "hono/cors";
 import { prettyJSON } from "hono/pretty-json";
 import { weatherController } from "./controllers/weather";
-import { WeatherPage } from "./templates/weather";
+import { WeatherErrorPage, WeatherPage } from "./templates/weather";
 import { serveStatic } from "hono/bun";
-import { R, pipe } from "@mobily/ts-belt";
+import { pipe } from "fp-ts/function";
 import { SwaggerUI } from "./templates/swagger";
-import { locationService, weatherService } from "./services";
 import { cacheMiddleware } from "./middleware";
-import { getTest } from "./routes";
+import * as TE from "fp-ts/TaskEither";
+import { locationService, weatherService } from "./services";
+
+// TODO: replace zod with typeBox?
+//https://github.com/sinclairzx81/typebox#benchmark
 
 // Register app
 export const app = new OpenAPIHono();
 
-// TODO: cool front page htmx + jsx?
-// TODO: Implement fallback
-// app.get("/*", (c) => c.html(<Fallback />));
-
 app.get("/", c => c.html(<FrontPage />));
 
-app.get("/weather", async c => {
-    const locationResult = await locationService.getLocation("Langgata", "Sandnes");
-
-    if (R.isError(locationResult)) {
-        c.html(
-            <html>
-                <main>
-                    <h1>Noe gikk galt</h1>
-                </main>
-            </html>
-        );
-    }
-
-    const { lon, lat } = pipe(locationResult, R.getExn);
-    const weatherResult = await weatherService.getWeatherNow(lon, lat);
-
-    if (R.isError(weatherResult)) {
-        return c.jsonT(weatherResult._0, 404);
-    }
-
-    const weatherNow = pipe(weatherResult, R.getExn);
-
-    return c.html(<WeatherPage weather={weatherNow} />);
+// @ts-ignore
+app.get("/weather", (c: any) => {
+    return pipe(
+        locationService.getLocation("Langgata 97", "Sandnes"),
+        TE.chain(({ lon, lat }) => weatherService.getWeatherNow(lon, lat)),
+        TE.fold(
+            error => () => c.html(<WeatherErrorPage error={error} />),
+            value => () => c.html(<WeatherPage weather={value} />)
+        )
+    )();
 });
 
 app.use("/static/*", serveStatic({ root: "./" }));
