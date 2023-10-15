@@ -1,9 +1,7 @@
 import {
     AirTempOutput,
-    AirTempResponse,
     AirTemperatureOutput,
-    StationOutput,
-    WeatherStationResponse
+    StationOutput
 } from "../models/frost";
 import * as TE from "fp-ts/TaskEither";
 import { http } from "../http";
@@ -19,30 +17,6 @@ const getWeatherNow = (lon: number, lat: number) => {
     );
 };
 
-const transformStationResponse = (json: WeatherStationResponse): string => {
-    return json.data[0].id;
-};
-
-const transformAirTempResponse = (json: AirTempResponse): AirTempOutput[] => {
-    return json.data.map(d => ({
-        from: d.referenceTime,
-        value: d.observations[0].value
-    }));
-};
-
-const transformTE = <A extends any[], T>(
-    fn: (...args: A) => T | Promise<T>
-): ((...args: A) => TE.TaskEither<AppError, T>) => {
-    return (...args: A) =>
-        TE.tryCatch(
-            () => Promise.resolve(fn(...args)), // Wrap the result in a Promise
-            error => ({
-                type: "ERROR",
-                error: new Error(error as string)
-            })
-        );
-};
-
 const getNearestWeatherStation = (
     lon: number,
     lat: number
@@ -50,7 +24,6 @@ const getNearestWeatherStation = (
     return pipe(
         http.fetchWeatherStation(lon, lat),
         TE.chain(parseTE(StationOutput))
-        // TE.chain(transformTE(transformStationResponse))
     );
 };
 
@@ -62,7 +35,6 @@ const getAirTemperatureObservations = (
     return pipe(
         http.fetchAirTempObservations(stationId, from, to),
         TE.chain(parseTE(AirTemperatureOutput))
-        // TE.chain(transformTE(transformAirTempResponse))
     );
 };
 

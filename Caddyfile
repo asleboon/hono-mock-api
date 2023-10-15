@@ -1,0 +1,7 @@
+:8081 {
+    reverse_proxy /api/* api:8080
+    log {
+        output file /var/log/access.log
+        format single_field common_log
+    }
+}
