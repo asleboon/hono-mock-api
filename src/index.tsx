@@ -21,6 +21,8 @@ import { WeatherErrorPage, WeatherPage } from "./templates/weather";
 // Register app
 export const app = new OpenAPIHono();
 
+app.get("/", (c: any) => c.html(<FrontPage />));
+
 app.use("/static/*", serveStatic({ root: "./" }));
 
 app.onError((err, c) => {
@@ -36,8 +38,6 @@ app.use("/api/v1/weather/*", cacheMiddleware);
 // Attach routes
 app.route("/api/v1/weather", weatherController);
 
-app.get("/", (c: any) => c.html(<FrontPage />));
-
 // @ts-ignore
 app.get("/weather", (c: any) => {
     return pipe(
@@ -48,19 +48,6 @@ app.get("/weather", (c: any) => {
             value => () => c.html(<WeatherPage weather={value} />)
         )
     )();
-});
-
-app.get("/metrics", async (c: any) => {
-    c.set("Content-Type", "text/plain");
-    const metrics = [
-        `# HELP custom_metric_1 This is a custom metric 1`,
-        `# TYPE custom_metric_1 counter`,
-        `custom_metric_1 2`,
-        `# HELP custom_metric_2 This is a custom metric 2`,
-        `# TYPE custom_metric_2 counter`,
-        `custom_metric_2 3`
-    ];
-    return c.text(metrics.join("\n"), 200);
 });
 
 // Swagger json or ui

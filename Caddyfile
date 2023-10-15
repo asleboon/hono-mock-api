@@ -1,7 +1,13 @@
+{
+	servers {
+    	metrics
+    }
+    admin :2019
+}
 :8081 {
-    reverse_proxy /api/* api:8080
+	reverse_proxy http://api:8080
     log {
         output file /var/log/access.log
-        format single_field common_log
+        format json
     }
 }

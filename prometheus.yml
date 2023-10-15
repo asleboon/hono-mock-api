@@ -1,13 +1,7 @@
-# prometheus.yml
-
 global:
-  scrape_interval: 15s
+  scrape_interval: 5s
 
 scrape_configs:
-  - job_name: 'api'
+  - job_name: caddy
     static_configs:
-      - targets: ['api:8080'] # Replace with the actual address of your API service
-
-  - job_name: 'caddy'
-    static_configs:
-      - targets: ['caddy:8081'] # Replace with the actual address of your Caddy service
+      - targets: ['caddy:2019']
